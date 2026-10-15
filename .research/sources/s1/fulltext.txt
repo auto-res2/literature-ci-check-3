@@ -1,0 +1,1020 @@
+GCSAM: Gradient Centralized Sharpness Aware Minimization
+Mohamed Hassan, Aleksandar Vakanski, Boyu Zhang, Min Xian
+Department of Computer Science, University of Idaho
+Abstract
+The generalization performance of deep neural networks
+(DNNs) is a critical factor in achieving robust model be-
+havior on unseen data. Recent studies have highlighted the
+importance of sharpness-based measures in promoting gen-
+eralization by encouraging convergence to flatter minima.
+Among these approaches, Sharpness-Aware Minimization
+(SAM) has emerged as an effective optimization technique
+for reducing the sharpness of the loss landscape, thereby
+improving generalization. However, SAM’s computational
+overhead and sensitivity to noisy gradients limit its scalabil-
+ity and efficiency. To address these challenges, we propose
+Gradient-Centralized Sharpness-Aware Minimization (GC-
+SAM), which incorporates Gradient Centralization (GC) to
+stabilize gradients and accelerate convergence. GCSAM
+normalizes gradients before the ascent step, reducing noise
+and variance, and improving stability during training. Our
+evaluations indicate that GCSAM consistently outperforms
+SAM and the Adam optimizer in terms of generalization and
+computational efficiency. These findings demonstrate GC-
+SAM’s effectiveness across diverse domains, including gen-
+eral and medical imaging tasks. Our code is available at
+https://github.com/mhassann22/GCSAM.
+1. Introduction
+Understanding the generalization behavior of overparame-
+terized deep neural networks (DNNs) has recently become
+a important area of study, as it offers valuable insights into
+handling overfitting and enhancing performance on unseen
+data [20, 50]. As the scale of models and datasets contin-
+ues to expand, the development of optimization algorithms
+that enhance generalization capabilities becomes increas-
+ingly critical. To better understand the generalization be-
+havior of DNNs, comprehensive empirical studies by Jiang
+et al. [18] and Dziugaite et al. [11] have evaluated various
+generalization metrics, finding that sharpness-based mea-
+sures exhibit the strongest correlation with generalization
+performance. Based on these findings, optimizers that lead
+to flatter minima, rather than sharp minima, are particularly
+effective in promoting generalization, as flatter minima have
+been shown to correlate strongly with improved model per-
+formance in overparameterized setting [8, 31].
+Sharpness-Aware Minimization (SAM) [12] is a promis-
+ing optimization technique for finding flatter minima to im-
+prove generalization, which achieved consistent improve-
+ment in generalization performance across various natural
+image and language benchmarks [3, 28, 46, 52].
+SAM
+regularizes the sharpness of the loss landscape by simul-
+taneously minimizing the training loss and the loss sharp-
+ness. SAM achieves this by employing adversarial pertur-
+bations ϵ to maximize the training loss LS(w + ϵ), where
+w is the weight vector. It then minimizes the loss of this
+perturbed objective using an update step from a base op-
+timizer, such as Adam [24]. To compute ϵ, SAM takes
+a linear approximation of the loss objective, and uses the
+gradient ∇LS(w) as the ascent direction for computing
+ϵ = ρ·norm(∇LS(w)), where ρ is the radius of the max-
+imization region, and norm(x) = x/||x||2 .
+However, SAM introduces a significant computational
+overhead, as the ascent step requires additional forward and
+backward passes, which doubles the training time. Further-
+more, the two-step training process requires tuning addi-
+tional hyper-parameters, which if not selected correctly, can
+lead to suboptimal performance or inefficient training. For
+instance, Wu et al. [47] and Chen et al. [6] demonstrate
+that the perturbation radius ρ should be adjusted beyond the
+range initially proposed by Foret et al. [12] to achieve opti-
+mal results. Additionally, while SAM successfully regular-
+izes the sharpness of the loss landscape, it does not address
+the issue of noisy and high-variance gradients, which can
+hinder the generalization performance.
+To mitigate these limitations, we propose Gradient Cen-
+tralized Sharpness Aware Minimization (GCSAM), which
+integrates Gradient Centralization (GC) [49] into the as-
+cent step of SAM. GC is a simple yet effective technique
+that normalizes the gradients by removing their mean, re-
+sulting in a more stable and smoother optimization process.
+Such normalization helps reduce gradient noise and vari-
+ance, addressing the issue of noisy gradients in SAM. GC
+not only accelerates convergence but also enhances gener-
+alization performance by promoting more consistent and
+aligned gradient updates [13, 49, 51]. Furthermore, GC
+reduces the sensitivity to hyperparameters, such as the per-
+turbation radius ρ, making the optimization process more
+robust and efficient. By combining GC with SAM, we not
+1
+arXiv:2501.11584v2  [cs.LG]  26 Jan 2025
+only regularize the sharpness of the loss landscape but also
+stabilize the training process, ultimately improving the gen-
+eralization performance across various tasks and datasets.
+In summary, our main contributions are as follows:
+• We propose GCSAM, a novel algorithm that com-
+bines Gradient Centralization (GC) with Sharpness-
+Aware Minimization (SAM). This integration targets both
+sharpness reduction and gradient stabilization, resulting
+in improved generalization.
+• GCSAM addresses limitations in SAM by reducing com-
+putational overhead and mitigating issues of gradient
+noise.
+By centralizing gradients, GCSAM provides a
+more stable optimization process that reduces gradient
+explosion, enhancing both efficiency and robustness.
+• We validate GCSAM’s performance on a range of bench-
+marks, demonstrating improved generalization in both
+general and medical imaging datasets.
+Our results in-
+dicate GCSAM’s ability to outperform SAM and base-
+line optimizers in achieving higher test accuracy with en-
+hanced computational efficiency.
+1.1. Related Work
+Loss Sharpness and Generalization. The connection be-
+tween the geometry of the loss landscape and generalization
+has been the subject of extensive research effort. Chaud-
+hari et al. [5] proposed Entropy-SGD, an approach aimed at
+minimizing the local entropy of the loss landscape to guide
+the optimization process toward flatter regions, thereby im-
+proving generalization.
+Similarly, Smith and Le
+[42]
+demonstrated that incorporating noise in SGD prevents the
+optimization from entering sharp valleys. Additionally, Lyu
+et al. [34] revealed that gradient descent has an inherent
+bias toward reducing sharpness, especially in the presence
+of normalization layers [48] and weight decay [27], which
+further supports the importance of managing the sharpness
+of the loss landscape to enhance generalization in DNNs.
+Improving SAM. Several variants of SAM have been
+proposed to enhance its performance and address its limi-
+tations. Adaptive-SAM (ASAM) [28] modifies SAM by
+introducing a scaling operator that eliminates sensitivity to
+model parameter re-scaling, allowing more robust gener-
+alization across different models. Kim et al. [23] refined
+both SAM and ASAM by leveraging Fisher information ge-
+ometry, providing a more effective method of minimizing
+sharpness in the parameter space. Zhuang et al. [52] high-
+lighted that minimizing the perturbed loss in SAM does not
+always guarantee a flatter loss landscape, leading to the de-
+velopment of Surrogate-Gap SAM (GSAM), which incor-
+porates a measure akin to the dominant eigenvalue of the
+Hessian matrix to capture sharpness more accurately. Ad-
+ditionally, Wu et al. observed that SAM’s one-step gradient
+approach may lose effectiveness due to the non-linearity of
+the loss landscape. To address this, they proposed Curva-
+ture Regularized SAM (CR-SAM) [46], which integrates
+a normalized Hessian trace to more precisely measure and
+regulate the curvature of the loss landscape. Kaddour et al.
+introduced Weight-Averaged SAM (WASAM) [19], which
+integrates SAM with Stochastic Weight Averaging (SWA)
+[17]. Their findings demonstrate that WASAM enhances
+SAM’s generalization performance, particularly in Natural
+Language Processing (NLP) tasks.
+In addition to improving performance, several algo-
+rithms have been proposed to mitigate the computational
+overhead associated with SAM. Liu et al. introduced Look-
+SAM [32], which accelerates SAM by periodically com-
+puting the inner gradient ascent at every kth iteration in-
+stead of at each step, reducing the frequency of expensive
+updates. Du et al. proposed Efficient SAM (ESAM) [10],
+which minimizes the number of input samples in the sec-
+ond forward and backward passes by utilizing Stochastic
+Weight Perturbation (SWP) and Sharpness-sensitive Data
+Selection (SDS) to balance efficiency and sharpness min-
+imization. Furthermore, Becker et al. developed Momen-
+tum SAM (MSAM) [4], incorporating Nesterov Acceler-
+ated Gradient (NAG) [37] to perturb parameters along the
+direction of the accumulated momentum vector, which im-
+proves both the convergence rate and computational effi-
+ciency of SAM.
+Gradient Optimization. Significant research effort has
+been dedicated to stabilizing and accelerating DNN train-
+ing through operations on gradients.
+Gradient clipping
+[1, 22, 38] was introduced to mitigate the issue of exploding
+gradients by limiting their magnitude during backpropaga-
+tion. Qian et al. [39] explored the use of momentum to
+accelerate gradient descent optimizers and reduce oscilla-
+tions, enhancing convergence speed. Further, Riemannian
+methods [7] and projected gradient techniques [14, 29, 45]
+were employed to regulate weight learning by projecting
+gradients onto subspaces, promoting more stable learning
+trajectories. Smith et al. [43] leveraged the gradient norm
+to derive an implicit regularization term in stochastic gradi-
+ent descent (SGD), aiding generalization. Additionally, l2
+regularization of weight gradients remains one of the most
+widely adopted strategies to improve the generalization ca-
+pabilities of DNNs [26, 44].
+2. Method
+In this section, we outline the methodological approaches of
+three techniques: Sharpness-Aware Minimization (SAM),
+Gradient Centralization (GC), and our proposed Gradient
+Centralized Sharpness-Aware Minimization (GCSAM).
+2.1. Sharpness Aware Minimization (SAM)
+While empirical risk minimization algorithms, such as SGD
+and Adam, effectively reduce the empirical loss LS(w) to
+achieve low training error, addressing the generalization gap
+2
+(a) Sketch map for GC
+(b) The geometrical interpretation of GC
+Figure 1. (a) Sketch map for using Gradient Centralization (GC). L is the loss function, w denotes the weight matrix, ∇LS(w) is the
+gradient of the entire weight matrix, and ∇GCLS(w) is the centralized gradient. (b) Geometrical interpretation of GC. The gradient is
+projected on a hyperplane ˆµ, where the projected gradient is used to update the weight.
+LD(w) −LS(w) remains a challenge in DNN training.
+Keskar et al. [21] proposed that there is a connection be-
+tween the sharpness of minimized empirical loss and the
+generalization gap, as the large sensitivity of the training
+function at a sharp minimizer negatively impacts the trained
+model’s ability to generalize on new data. To formalize this
+connection, sharpness is defined within an ϵ-ball as:
+max
+||ϵ||p≤ρ LS(w + ϵ) −LS(w),
+(1)
+where ρ is the radius of maximization region of an ℓp ball.
+From the above definition, sharpness is the difference be-
+tween the maximum empirical loss in the ℓp ball and the
+empirical loss.
+Foret et al. [12] introduced Sharpness-Aware Minimiza-
+tion (SAM), which integrates sharpness minimization with
+a PAC-Bayes norm to improve generalization. SAM is de-
+signed to enhance generalization by minimizing the sharp-
+ness of the loss landscape, encouraging convergence to flat
+minima. This is achieved by optimizing the following PAC-
+Bayesian generalization error bound:
+LD(w) ≤max
+||ϵ||p≤ρ LS(w + ϵ) + h(||w||2
+2
+ρ2
+),
+(2)
+where the monotonic nature of h allows substitution with an
+ℓ2 weight-decay regularizer. Thus, SAM can be formulated
+as a minimax optimization problem, aiming to mitigate gen-
+eralization error while maintaining training stability:
+min
+w
+max
+||ϵ||p≤ρ LS(w + ϵ) + λ
+2 (||w||2
+2
+ρ2
+).
+(3)
+2.2. Gradient Centralization (GC)
+Gradient Centralization
+[49] is an optimization tech-
+nique designed to improve both generalization and stabil-
+ity in deep neural networks (DNNs) by centering gradients
+around a mean of zero during training. In this context, the
+layer’s loss function is represented as LS(w), with LS(wi)
+specifically denoting the loss contribution from the i-th col-
+umn of w. Under the standard DNN setup, the gradient of
+the entire weight matrix is given by ∇LS(w), and the gradi-
+ent of the individual weight vector as ∇LS(wi). Similarly,
+when applying Gradient Centralization to a DNN, the gra-
+dient of a vector is denoted as ∇GCLS(wi) and is defined
+as:
+∇GCLS(wi) = ∇LS(wi) −1
+n
+n−1
+X
+j=0
+∇LS(wij).
+(4)
+Correspondingly, Gradient Centralization is applied by pro-
+jecting the gradient, ∇LS(w) onto a subspace orthogonal
+to the mean gradient direction. This projection is achieved
+using the matrix P = I −ee⊤, where e represents a vec-
+tor of equal components. Mathematically, the centralized
+gradient is defined as:
+∇GCLS(w) = P∇LS(w) = ∇LS(w) −µ,
+(5)
+where µ is the mean gradient. From the above equation, the
+only difference between centralized gradient ∇GCLS(w)
+and standard gradient LS(w) is a deducted mean value from
+the weight matrix as illustrated in Fig. 1b.
+3
+Algorithm 1: GCSAM algorithm
+Input: Loss function L, Training dataset S, Mini-batch
+size b, Radius of maximization region ρ, Step size α > 0,
+Initial weight w0
+Output: Trained weight w
+while not converged do
+Sample a mini-batch B of size b from S
+Compute gradient g = ∇LB(w) of the training loss
+Centralize gradient gGC = g −µ
+Perturb weights for Ascent Step ϵGC = ρ
+gGC
+||gGC||2
+Compute Descent Step w = w −α(gGC(w + ϵGC))
+end while
+return w
+(a) GCSAM Algorithm
+(b) Schematic of the GCSAM parameter update
+Figure 2. (a) GCSAM Algorithm. (b) Schematic of the GCSAM paramter update, where wt is the current step, ϵGC perturbs weights fot
+the ascent step, and wt+1 is the next step.
+2.3. Gradient Centralized Sharpness Aware Mini-
+mization (GCSAM)
+Motivated by SAM and GC we propose Gradient Central-
+ized Sharpness Aware Minimization (GCSAM), to stabi-
+lize the training process and address the noisy gradients in
+SAM. GCSAM combines these principles by applying gra-
+dient centralization into the ascent step of SAM. Specifi-
+cally, GCSAM minimizes a centralized version of the sharp-
+ness objective by applying GC to the gradient used in
+SAM’s inner maximization problem. This leads to a refor-
+mulated objective:
+min
+w
+max
+||ϵGC||p≤ρ LS(w + ϵGC) + λ
+2 (||w||2
+2
+ρ2
+),
+(6)
+where ϵGC denotes perturbations aligned with the central-
+ized gradient ∇GCLS(w):
+ϵGC = ρ
+∇GCLS(w)
+||∇GCLS(w)||p
+,
+(7)
+The final GCSAM algorithm is formulated by integrating a
+standard numerical optimizer, such as SGD or Adam, as the
+base optimizer for the GCSAM objective. This combina-
+tion allows for efficient gradient-based optimization while
+leveraging the benefits of gradient centralization within the
+SAM framework. The pseudo-code for the GCSAM algo-
+rithm, provided in Fig. 2a, outlines the proposed approach
+with SGD as the base optimizer, highlighting the procedural
+steps involved in each update cycle. Additionally, Fig. 2b
+provides a schematic illustration of a single GCSAM pa-
+rameter update, visually capturing the interaction between
+gradient centralization and sharpness-aware minimization
+in the update process. In particular, GCSAM ensures that
+the magnitude of the centralized gradient is always less
+than or equal to the original gradient magnitude, leading
+to tighter sharpness bounds. Details of the derivations and
+proof are included in Theorem A.1 in the Appendix.
+3. Experimental Results
+To evaluate the effectiveness of GCSAM, we apply it across
+a diverse set of tasks, including image classification on
+CIFAR-10 and medical imaging challenges with Breast Ul-
+trasound (BUS) and COVID-19 datasets. In each case, we
+assess the impact of GCSAM by benchmarking it against
+SAM and a standard Adam optimizer, using a variety of
+deep learning architectures.
+These include CNN-based
+models, such as ResNet-50
+[16] and VGG-16 [41], and
+Vision Transformer architectures like ViT
+[9] and Swin
+Transformer [33]. Such experimental evaluation allows us
+to systematically explore the benefits of GCSAM in both
+general and domain-specific applications.
+3.1. Image Classification in General Domain
+To confirm the effectiveness of GCSAM in the general do-
+main, we conduct a comparative experiment with Adam,
+SAM and GCSAM using CIFAR-10 dataset [25], contain-
+ing 60,000 images across 10 classes. We asses the perfor-
+mance of Resnet50 [16], VGG-16 [41], ViT [9] and Swin
+Transformer [33]. Each model is trained from scratch with
+a training batch size of 128. We use grid search to iden-
+tify optimal values for the learning rate (α), and perturba-
+tion magnitude (ρ) for each model. Training continues un-
+til each model achieves 100% accuracy on the training set,
+with Early Stopping applied to mitigate overfitting, consis-
+tent with the experimental settings used by Jiang et al. [18]
+and Dziugaite et al. [11].
+4
+Model
+Adam
+SAM
+GCSAM
+Resnet50
+90.1
+90.8
+91.2
+VGG16
+92.98
+94.8
+95.1
+ViT
+83.25
+84.05
+84.08
+Swin Transformer
+82.84
+85.22
+85.66
+Table 1. Results for Adam, SAM, and GCSAM on CIFAR-10
+Model
+Adam
+SAM
+GCSAM
+Resnet50
+67.1
+67.7
+70.1
+VGG16
+81.6
+82.6
+83.2
+ViT
+70.4
+70.2
+72.1
+Swin Transformer
+69.3
+70.2
+70.7
+Table 2. Results for Adam, SAM, and GCSAM on BUS
+In Tab. 1, we report the test accuracies of GCSAM com-
+pared to the baseline Adam optimizer and SAM across the
+four models. The results demonstrate that GCSAM consis-
+tently achieves better generalization performance, outper-
+forming both Adam and SAM across all trained architec-
+tures.
+3.2. Image Classification in Medical Domain
+Generalization is particularly challenging in the medical do-
+main, where images are collected using a variety of de-
+vices, imaging protocols, and across diverse patient pop-
+ulations. These factors introduce unique complexities that
+impact model performance on unseen data. Prior studies
+have demonstrated that SAM consistently outperforms tra-
+ditional optimizers like Adam and SGD across various mod-
+els due to its ability to achieve flatter minima [15, 35]. To
+assess the efficacy of GCSAM in tackling these domain-
+specific challenges, we conduct extensive experiments us-
+ing two medical datasets: breast ultrasound (BUS) images
+and COVID-19 chest X-ray images. These datasets are cho-
+sen to evaluate the algorithm’s robustness under varying
+imaging conditions and domain shifts.
+Breast Ultrasound (BUS) dataset. We combined 3,641
+breast ultrasound images from
+[40] with 2,405 images
+from the GDPH&SYSUCC dataset [36], yielding a total of
+6,046 breast ultrasound images classified as benign or ma-
+lignant cases. We partitioned this dataset into an 80%-20%
+train-test split. Using an Adam optimizer, SAM and GC-
+SAM, with a learning rate of 10−4 and a batch size of 16,
+we trained ResNet50, VGG16, ViT and Swin transformer.
+Each model was trained until achieving 100% training ac-
+curacy.
+The results presented in Tab. 2 demonstrate that GCSAM
+consistently outperforms both the baseline Adam optimizer
+and SAM across all evaluated models. This performance
+improvement highlights GCSAM’s capability to enhance
+generalization in medical imaging tasks.
+COVID-19 chest X-ray dataset.
+We performed ad-
+ditional experiments utilizing 16,955 COVID-19 chest X-
+ray images from the COVIDx CXR-4 dataset
+[2], cate-
+gorized into positive and negative cases. For these exper-
+iments, we trained ResNet50, VGG16, Vision Transformer
+(ViT), and Swin Transformer models with a learning rate
+of 10−4 and a batch size of 16. The generalization perfor-
+mance of GCSAM was evaluated against the Adam opti-
+mizer, SAM, and several prominent SAM variants: Adap-
+tive SAM (ASAM)
+[28], Surrogate-Gap SAM (GSAM)
+[52], Curvature-Regularized SAM (CRSAM)
+[46], and
+Momentum SAM (MSAM) [4]. To benchmark GCSAM’s
+computational efficiency, we compared it against SAM and
+its variants, using Adam as the baseline optimizer with a
+relative speed of 1.0. This evaluation provided insights into
+any additional computational overhead introduced by GC-
+SAM while also assessing its effectiveness in improving
+model generalization.
+In Tab. 3, we report the test accuracy and com-
+putational cost for each optimizer across four models:
+ResNet50, VGG16, ViT, and Swin Transformer, trained on
+the COVID-19 CXR-4 dataset. We observe that GCSAM
+consistently achieves higher test accuracy than the baseline
+Adam optimizer, SAM and its variants across all models,
+highlighting its effectiveness in improving generalization
+performance on medical image classification tasks. In terms
+of computational cost, GCSAM incurs a moderate overhead
+compared to Adam, but generally operates more efficiently
+than SAM, especially on the Vision Transformer (ViT) and
+Swin Transformer models. For each model, we present the
+training speed relative to Adam, where Adam’s speed is
+normalized to 1.0. This setup enables a direct comparison
+of the computational impact of each optimizer. These re-
+sults indicate that GCSAM maintains competitive efficiency
+while enhancing accuracy across different neural network
+architectures on the COVID-19 dataset.
+4. Discussion
+In this section, we analyze the results presented in Tab. 1,
+Tab. 2, and Tab. 3, highlighting the improved generalization
+and training efficiency offered by the GCSAM optimizer in
+comparison to SAM and the baseline Adam optimizer.
+Better Generalization Performance.
+Across the
+CIFAR-10 dataset (Tab. 1), GCSAM achieves higher test
+accuracies than both SAM and Adam on all four tested
+architectures: ResNet50, VGG16, ViT, and Swin Trans-
+former. This demonstrates that GCSAM’s ability to mit-
+igate gradient explosion in the ascent step of SAM re-
+sults in more effective training and better model robust-
+ness on unseen data. Moreover, GCSAM’s generalization
+improvements are more pronounced in medical imaging
+5
+Optimizer
+Test Accuracy
+Speed
+Adam
+86.1
+1.00
+SAM
+89.2
+2.27
+ASAM
+90.2
+5.60
+GSAM
+88.4
+6.41
+CRSAM
+86.6
+1.37
+MSAM
+87.3
+1.14
+GCSAM
+90.4
+2.10
+(a) ResNet50
+Optimizer
+Test Accuracy
+Speed
+Adam
+90.7
+1.00
+SAM
+91.4
+1.28
+ASAM
+91.0
+5.83
+GSAM
+91.5
+6.67
+CRSAM
+90.3
+1.04
+MSAM
+89.3
+1.02
+GCSAM
+91.8
+1.07
+(b) VGG16
+Optimizer
+Test Accuracy
+Speed
+Adam
+81.7
+1.00
+SAM
+82.2
+1.32
+ASAM
+82.5
+3.39
+GSAM
+78.1
+3.60
+CRSAM
+80.5
+1.13
+MSAM
+80.3
+1.05
+GCSAM
+82.5
+1.18
+(c) ViT
+Optimizer
+Test Accuracy
+Speed
+Adam
+86.6
+1.00
+SAM
+87.5
+2.04
+ASAM
+87.4
+5.43
+GSAM
+84.8
+5.89
+CRSAM
+86.0
+1.36
+MSAM
+84.4
+1.08
+GCSAM
+87.7
+1.87
+(d) Swin Transformer
+Table 3. Generalization performance and computational cost for Adam, SAM, Adaptive SAM (ASAM), Surrogate-Gap SAM (GSAM),
+Curvature-Regularized SAM (CRSAM), Momentum SAM (MSAM), and Gradient-Centralized SAM (GCSAM) on COVID-19 dataset.
+tasks, where domain shifts and data variability pose signif-
+icant challenges to traditional optimization methods. For
+instance, in breast ultrasound (BUS) images (Tab. 2) and
+COVID-19 chest X-rays (Tab. 3), GCSAM consistently out-
+performs SAM and Adam, demonstrating its resilience to
+the inherent variability of medical image datasets. Specif-
+ically, for the COVID-19 dataset, GCSAM surpasses all
+tested SAM variants, further establishing its effectiveness
+in challenging domains.
+To enhance generalization across all tested models, GC-
+SAM emphasizes three key aspects: sharpness reduction,
+normalized gradient direction, and suppression of gradi-
+ent explosion. A core objective of GCSAM is to reduce
+sharpness in the loss landscape, encouraging convergence
+in flat regions instead of sharp valleys, which are linked to
+poor generalization due to the model’s sensitivity to small
+changes in data or input. Additionally, GCSAM modifies
+the gradients at each optimization step by subtracting the
+mean of the gradient elements for each layer. This operation
+serves multiple purposes, such as reducing redundancy in
+weight updates and promoting a smoother optimization tra-
+jectory. As a result, GCSAM prevents undue emphasis on
+specific neurons or channels, facilitating the model’s abil-
+ity to learn more generalizable features. Furthermore, GC-
+SAM mitigates the risk of gradient explosion, a common
+issue where gradients grow excessively large, destabilizing
+parameter updates. In the context of SAM, where gradients
+are perturbed during the ascent step to explore the loss sur-
+face, GCSAM’s stabilizing effect prevents the emergence
+of large gradients, ensuring more controlled updates. This
+combined effect enables the model to converge in flatter,
+more stable regions of the loss surface, avoiding the insta-
+bility typically caused by the ascent step. In practice, these
+enhancements lead to improved accuracy on test data across
+diverse datasets and better performance in various domains,
+including general and medical imaging tasks.
+Better Computational Efficieny. GCSAM offers com-
+putational advantages over SAM, as shown in Tab. 3, with
+lower relative training times across all models. By reduc-
+ing gradient spikes, GCSAM accelerates convergence, re-
+quiring fewer iterations and thus faster training. This effi-
+ciency is particularly beneficial for large-scale models and
+datasets, where SAM’s ascent step can be computationally
+expensive. GCSAM’s gradient centralization stabilizes up-
+dates, further reducing the computational cost and enabling
+quicker training by maintaining the model in stable regions
+of the loss landscape. As a result, GCSAM strikes an ef-
+fective balance between generalization and computational
+efficiency.
+Visualization of Loss Landscapes. To analyze the ge-
+ometry of the loss landscapes obtained with GCSAM, we
+plotted the loss landscapes of ResNet50 models trained us-
+ing Adam, SAM, and GCSAM on the COVID-19 dataset.
+Following the generalization techniques described in [30],
+the loss values were visualized along two orthogonal Gaus-
+sian perturbation directions sampled around the local min-
+ima. The results in Fig. 3 reveal that GCSAM produces con-
+sistently flatter minima compared to both Adam and SAM.
+6
+(a) Adam optimized viewing angle 1
+(b) SAM optimized viewing angle 1
+(c) GCSAM optimized viewing angle 1
+(d) Adam optimized viewing angle 2
+(e) SAM optimized viewing angle 2
+(f) GCSAM optimized viewing angle 2
+Figure 3. Comparison of loss landscapes for Adam, SAM, and GCSAM on the COVID-19 dataset. Adam demonstrates the sharpest
+minima, reflecting less stable convergence. In contrast, GCSAM achieves the flattest minima, indicative of improved stability and better
+convergence properties.
+5. Conclusion
+In this work, we introduced the Gradient-Centralized
+Sharpness-Aware
+Minimization
+(GCSAM)
+optimizer,
+aimed at enhancing model generalization and training sta-
+bility across diverse applications. Through our comparative
+analysis with the baseline Adam optimizer and SAM, we
+observed that GCSAM consistently achieved higher test
+accuracies in both standard datasets, such as CIFAR-10,
+and complex medical imaging datasets, including breast
+ultrasound and COVID-19 chest X-ray images. Our experi-
+ments show that GCSAM not only improves performance
+in terms of test accuracy but also accelerates the training
+process compared to SAM, attributed to reduced redun-
+dancy in weight updates and stabilized parameter changes
+during the ascent step. These properties make GCSAM a
+promising approach for applications where data variability
+and generalization are critical, especially in the medical
+domain where domain shifts and equipment variability
+pose significant challenges.
+Future work could explore
+incorporating momentum-based strategies within GCSAM
+to further reduce computational costs, making it even more
+efficient for large-scale applications. Additionally, adaptive
+strategies for automatic hyperparameter tuning could
+enhance its applicability, while extending its use to other
+domains requiring robust generalization performance.
+References
+[1] Mart´ın Abadi, Andy Chu, Ian Goodfellow, H. Brendan
+McMahan, Ilya Mironov, Kunal Talwar, and Li Zhang. Deep
+learning with differential privacy. Proceedings of the 2016
+ACM SIGSAC Conference on Computer and Communica-
+tions Security, pages 308–318, 2016.
+[2] Mohammed Al-Yousif and Belal Al-Khateeb. Quantum con-
+volutional neural network for image classification. Fusion
+Practice and Applications, 15(2):61–72, 2024.
+[3] Dara Bahri, Hossein Mobahi, and Yi Tay. Sharpness-aware
+minimization improves language model generalization. Pro-
+ceedings of the 60th Annual Meeting of the Association for
+Computational Linguistics, Volume 1: Long Papers, 2022.
+[4] Marlon Becker, Rederick Altrock, and Benjamin Risse.
+Momentum-sam:
+Sharpness aware minimization without
+computational overhead. CoRR, 2024.
+[5] Pratik Chaudhari, Anna Choromanska, Stefano Soatto, Yann
+LeCun, Carlo Baldassi, Christian Borgs, Jennifer Chayes,
+Levent Sagun, and Riccardo Zecchina. Entropy-sgd: Biasing
+gradient descent into wide valleys. International Conference
+on Learning, ICLR, 2017.
+[6] Xiangning Chen, Cho-Jui Hsieh, and Boqing Gong. When
+vision transformers outperform resnets without pre-training
+or strong data augmentations. ICLR, 2022.
+[7] Minhyung Cho and Jaehyung Lee. Riemannian approach to
+batch normalization. Advances in Neural Information Pro-
+cessing Systems, 30:5225–5235, 2017.
+7
+[8] Laurent Dinh, Razvan Pascanu, Samy Bengio, and Yoshua
+Bengio. Sharp minima can generalize for deep nets. Interna-
+tional Conference on Machine Learning, ICML 2017, 2017.
+[9] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,
+Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner,
+Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-
+vain Gelly, Jakob Uszkoreit, and Neil Houlsby. An image
+is worth 16x16 words: Transformers for image recognition
+at scale. International Conference on Learning Representa-
+tions, ICLR, 2021.
+[10] Jiawei Du, Hanshu Yan, Jiashi Feng, Joey Zhou, Liangli
+Zhen, Rick Goh, and Vincent Tan. Efficient sharpness-aware
+minimization for improved training of neural networks. In-
+ternational Conference on Learning Representations, 2022.
+[11] Gintare Karolina Dziugaite, Alexandre Drouin, Brady Neal,
+Nitarshan Rajkumar, Ethan Caballero, Linbo Wang, Ioannis
+Mitliagkas, and Daniel M. Roy. In search of robust measures
+of generalization. Annual Conference on Neural Information
+Processing Systems 2020, NeurIPS, 2020.
+[12] Pierre Foret, Ariel Kleiner, Hossein Mobahi, and Behnam
+Neyshabur.
+Sharpness-aware minimization for efficiently
+improving generalization.
+International Conference on
+Learning Representations, ICLR 2021 Spotlight, 2021.
+[13] Wolfgang Fuhl and Enkelejda Kasneci. Weight and gradi-
+ent centralization in deep neural networks. Artificial Neu-
+ral Networks and Machine Learning – ICANN 2021, 12894:
+227–239, 2019.
+[14] Harshit Gupta, Kyong Jin, Ha Nguyen, Michael McCann,
+and Michael Unser. Cnn-based projected gradient descent
+for consistent image reconstruction. IEEE transactions on
+medical imaging, 37(6):1440–1453, 2018.
+[15] Mohamed Hassan, Aleksandar Vakanski, and Min Xian. Do
+sharpness-based optimizers improve generalization in medi-
+cal image analysis? arXiv preprint arXiv:2408.04065, 2024.
+[16] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+Deep residual learning for image recognition. IEEE Confer-
+ence on Computer Vision and Pattern Recognition, CVPR,
+pages 770–778, 2016.
+[17] Pavel Izmailov, Dmitrii Podoprikhin, Timur Garipov, Dmitry
+Vetrov, and Andrew Wilson.
+Averaging weights leads to
+wider optima and better generalization. Proceedings of the
+Thirty-Fourth Conference on Uncertainty in Artificial Intel-
+ligence, 2018.
+[18] Yiding Jiang, Behnam Neyshabur, Hossein Mobahi, Dilip
+Krishnan, and Samy Bengio. Fantastic generalization mea-
+sures and where to find them. 8th International Conference
+on Learning Representations, ICLR 2020, 2020.
+[19] Jean Kaddour, Linqing Liu, Ricardo Silva, and Matt J. Kus-
+ner. When do flat minima optimizers work?
+Advances in
+Neural Information Processing Systems, 35:16577–16595,
+2022.
+[20] Kenji Kawaguchi, Leslie Kaelbling, and Yoshua Bengio.
+Generalization in deep learning. Mathematical Aspects of
+Deep Learning, Cambridge University Press, 2022.
+[21] Nitish Keskar, Dheevatsa Mudigere, Jorge Nocedal, Mikhail
+Smelyanskiy, and Ping Tang.
+On large-batch training for
+deep learning: Generalization gap and sharp minima. In-
+ternational Conference on Learning, ICLR, 2017.
+[22] Jiwon Kim, Jung Kwon Lee, and Kyoung Mu Lee. Accurate
+image super-resolution using very deep convolutional net-
+works.
+Proceedings of the IEEE conference on computer
+vision and pattern recognition, pages 1646–1654, 2016.
+[23] Minyoung Kim, Da Li, Shell Hu, and Timothy Hospedales.
+Fisher sam: Information geometry and sharpness aware min-
+imisation. Proceedings of the 39th International Conference
+on Machine Learning, 162:11148–11161, 2022.
+[24] Diederik Kingma and Jimmy Ba.
+Adam: A method for
+stochastic optimization. CoRR, abs/1412.6980, 2014.
+[25] Alex Krizhevsky. Learning multiple layers of features from
+tiny images. University of Toronto, 2009.
+[26] Anders Krogh and John Hertz. A simple weight decay can
+improve generalization.
+Advances in Neural Information
+Processing Systems, pages 950–957, 1992.
+[27] Anders Krogh and John A. Hertz. A simple weight decay
+can improve generalization. Advances in Neural Information
+Processing Systems, 4, 1991.
+[28] Jungmin Kwon,
+Jeongseop Kim,
+Hyunseo Park,
+and
+In Kwon Choi. Asam: Adaptive sharpness-aware minimiza-
+tion for scale-invariant learning of deep neural networks.
+Proceedings of the 38th International Conference on Ma-
+chine Learning, 139:5905–5914, 2022.
+[29] M˚ans Larsson, Anurag Arnab, Fredrik Kahl, Shuai Zheng,
+and Philip Torr. A projected gradient descent method for crf
+inference allowing end-to-end training of arbitrary pairwise
+potentials. International Workshop on Energy Minimization
+Methods in Computer Vision and Pattern Recognition, pages
+564–579, 2017.
+[30] Hao Li, Zheng Xu, Gavin Taylor, Christoph Studer, and Tom
+Goldstein. Visualizing the loss landscape of neural nets. Ad-
+vances in neural information processing systems, 2018.
+[31] Hao Li, Zheng Xu, Gavin Taylor, Christoph Studer, and Tom
+Goldstein. Visualizing the loss landscape of neural nets. Ad-
+vances in Neural Information Processing Systems, NeurIPS,
+2018.
+[32] Yong Liu, Siqi Mai, Xiangning Chen, Cho-Jui Hsieh, and
+Yang You. Towards efficient and scalable sharpness-aware
+minimization. Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition, 2022.
+[33] Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei,
+Zheng Zhang, Stephen Lin, and Baining Guo. Swin trans-
+former: Hierarchical vision transformer using shifted win-
+dows.
+IEEE/CVF International Conference on Computer
+456 Vision, ICCV, pages 9992–10002, 2021.
+[34] Kaifeng Lyu, Zhiyuan Li, and Sanjeev Arora. Understanding
+the generalization benefit of normalization layers: Sharpness
+reduction. Advances in Neural Information Processing Sys-
+tems, 35:34689–34708, 2022.
+[35] Iqra Mariam, Xiaorong Xue, and Kaleb Gadson. A retinal
+vessel segmentation method based on the sharpness-aware
+minimization model. Sensors, 24(13), 2024.
+[36] Yuhao Mo, Chu Han, Yu Liu, Min Liu, Zhenwei Shi, Jiatai
+Lin, Bingchao Zhao, Chunwang Huang, Bingjiang Qiu, Yan-
+fen Cui, Lei Wu, Xipeng Pan, Zeyan Xu, Xiaomei Huang,
+Zaiyi Liu, Ying Wang, and Changhong Liang. Hover-trans:
+Anatomy-aware hover-transformer for roi-free breast cancer
+8
+diagnosis in ultrasound images. IEEE Transactions Medical
+Imaging, 42(6):1696–1706, 2023.
+[37] Yurii Nesterov. A method for solving a convex programming
+problem with convergence rate o(1/k2). 1983.
+[38] Razvan Pascanu, Tomas Mikolov, and Yoshua Bengio. Un-
+derstanding the exploding gradient problem. CoRR, 2012.
+[39] Ning Qian.
+On the momentum term in gradient descent
+learning algorithms. Neural networks, 12(1):145–151, 1999.
+[40] Bryar Shareef, Min Xian, Shoukun Sun, Aleksandar Vakan-
+ski, Jianrui Ding, Chunping Ning, and A Benchmark for
+Breast Ultrasound Image Classification Heng-Da Cheng.
+A benchmark for breast ultrasound image classification.
+Available at SSRN: https://ssrn.com/abstract=4339660 or
+http://dx.doi.org/10.2139/ssrn.4339660, 2023.
+[41] Karen Simonyan and Andrew Zisserman. Very deep convo-
+lutional networks for large-scale image recognition. 3rd In-
+ternational Conference on Learning Representations, ICLR,
+pages 1–14, 2015.
+[42] Samuel Smith and Quoc Le. A bayesian perspective on gen-
+eralization and stochastic gradient descent.
+International
+Conference on Learning, ICLR, 2017.
+[43] Samuel Smith, Benoit Dherin, David Barrett, and Soham De.
+On the origin of implicit regularization in stochastic gradient
+descent. International Conference on Learning Representa-
+tions, ICLR, 2021.
+[44] Twan van Laarhoven.
+L2 regularization versus batch and
+weight normalization. arXiv:1706.05350, 2017.
+[45] Eugene Vorontsov, Chiheb Trabelsi, Samuel Kadoury, and
+Chris Pal. On orthogonality and learning recurrent networks
+with long term dependencies. Proceedings of the 34th Inter-
+national Conference on Machine Learning, 70:3570–3578,
+2017.
+[46] Tao Wu, Tie Luo, and Donald Wunsch II. Cr-sam: Curva-
+ture regularized sharpness-aware minimization. Proceedings
+of the AAAI Conference on Artificial Intelligence, 38:6144–
+6152, 2024.
+[47] Yihan Wu, Aleksandar Bojchevski, and Heng Huang. Adver-
+sarial weight perturbation improves generalization in graph
+neural networks. Proceedings of the Thirty-Seventh AAAI
+Conference on Artificial Intelligence, 1170:10417 – 10425,
+2023.
+[48] Jingjing Xu, Xu Sun, Zhiyuan Zhang, Guangxiang Zhao, and
+Junyang Lin. Understanding and improving layer normaliza-
+tion. Advances in Neural Information Processing Systems,
+32, 2019.
+[49] Hongwei Yong, Jianqiang Huang, Xiansheng Hua, and Lei
+Zhang. Gradient centralization: A new optimization tech-
+nique for deep neural networks. Computer Vision – ECCV
+2020. ECCV 2020, Springer, 2020.
+[50] Chiyuan Zhang, Samy Bengio, Moritz Hardt, Benjamin
+Recht, and Oriol Vinyals. Understanding deep learning re-
+quires rethinking generalization. 5th International Confer-
+ence on Learning Representations, ICLR 2017, 2017.
+[51] Mo Zhou, Tianyi Liu, Yan Li, Dachao Lin, Enlu Zhou, and
+Tuo Zhao. Toward understanding the importance of noise in
+training neural networks. Proceedings of the 36th Interna-
+tional Conference on Machine Learning, PMLR, 97:7594–
+7602, 2019.
+[52] Juntang Zhuang, Boqing Gong, Liangzhe Yuan, Yin Cui,
+Hartwig Adam, Nicha Dvornek, Sekhar Tatikonda, James
+Duncan, and Ting Liu.
+Surrogate gap minimization im-
+proves sharpness-aware training. International Conference
+on Learning Representations, 2022.
+9
+A. Appendix
+A.1. Generalization bound for Gradient Centralized Sharpness Aware Minimization (GCSAM)
+Theorem A.1. Let ∇GCLS(w) = P∇LS(w), where P = 1 −eeT and e is a unit vector with eT e = 1. If
+LD(w) ≤Eϵi∼N(0,σ2)[LD(w + ϵ)] for some σ > 0, then with probability 1 −δ , the GCSAM generalization bound is given
+by:
+LD(w) ≤
+max
+∥ϵGC∥p≤ρ LS(w + ϵGC) +
+s
+1
+n −1(k log(1 + ||w||2
+2
+η2ρ2 (1 +
+r
+log n
+k
+)2) + 4 log n
+δ + O(1)),
+where n = |S| is the dataset size, ρ =
+√
+kσ(1 +
+p
+log n/k)/n, and ϵGC = ρ
+∇GCLS(w)
+||∇GCLS(w)||ρ .
+Proof. Using the proof in SAM by Foret et al. [12], from the assumption that adding Gaussian perturbation on the weight
+space doesn’t improve the test error. The following PAC-Bayesian generalization bound holds under the perturbations:
+Eϵi∼N(0,σ2)[LD(w + ϵ)] ≤Eϵi∼N(0,σ2)[LS(w + ϵ)] +
+s
+1
+n −1(k log(1 + ||w||2
+2
+η2ρ2 (1 +
+r
+log n
+k
+)2) + 4 log n
+δ + O(1)),
+which can be bounded as:
+LD(w) ≤max
+||ϵ||p≤ρ LS(w + ϵGC) +
+s
+1
+n −1(k log(1 + ||w||2
+2
+η2ρ2 (1 +
+r
+log n
+k
+)2) + 4 log n
+δ + O(1)).
+For the centralized gradient, the magnitude is:
+∥∇GCLS(w)∥2
+2 = (∇GCLS(w))⊤∇GCLS(w)
+Expanding this:
+∥∇GCLS(w)∥2
+2 = (P∇LS(w))⊤(P∇LS(w))
+Using the symmetry of P:
+∥∇GCLS(w)∥2
+2 = ∇LS(w)⊤P⊤P∇LS(w) = ∇LS(w)⊤P∇LS(w)
+Expanding P = I −ee⊤:
+∥∇GCLS(w)∥2
+2 = ∇LS(w)⊤(I −ee⊤)∇LS(w)
+= ∇LS(w)⊤∇LS(w) −∇LS(w)⊤ee⊤∇LS(w)
+= ∥∇LS(w)∥2
+2 −∥e⊤∇LS(w)∥2
+2,
+where ∥e⊤∇LS(w)∥2
+2 is non-negative, so we get that:
+∥∇GCLS(w)∥2
+2 ≤∥∇LS(w)∥2
+2.
+The inequality demonstrates that the centralized gradient magnitude is always less than or equal to the original gradient
+magnitude. Using the reduced gradient magnitude, the perturbation ϵGC in GCSAM leads to tighter sharpness bounds
+(max∥ϵ∥p≤ρ LS(w + ϵ) −→max∥ϵGC∥p≤ρ LS(w + ϵGC)). Using this information we get that:
+LD(w) ≤
+max
+∥ϵGC∥p≤ρ LS(w + ϵGC) +
+s
+1
+n −1(k log(1 + ||w||2
+2
+η2ρ2 (1 +
+r
+log n
+k
+)2) + 4 log n
+δ + O(1))
+10

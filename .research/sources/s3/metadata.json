@@ -1,0 +1,45 @@
+{
+  "title": "Efficient Sharpness-aware Minimization for Improved Training of Neural Networks",
+  "authors": [
+    "Jiawei Du",
+    "Hanshu Yan",
+    "Jiashi Feng",
+    "Joey Tianyi Zhou",
+    "Liangli Zhen",
+    "Rick Siow Mong Goh",
+    "Vincent Y. F. Tan"
+  ],
+  "abstract": "Overparametrized Deep Neural Networks (DNNs) often achieve astounding performances, but may potentially result in severe generalization error. Recently, the relation between the sharpness of the loss landscape and the generalization error has been established by Foret et al. (2020), in which the Sharpness Aware Minimizer (SAM) was proposed to mitigate the degradation of the generalization. Unfortunately, SAM s computational cost is roughly double that of base optimizers, such as Stochastic Gradient Descent (SGD). This paper thus proposes Efficient Sharpness Aware Minimizer (ESAM), which boosts SAM s efficiency at no cost to its generalization performance. ESAM includes two novel and efficient training strategies-StochasticWeight Perturbation and Sharpness-Sensitive Data Selection. In the former, the sharpness measure is approximated by perturbing a stochastically chosen set of weights in each iteration; in the latter, the SAM loss is optimized using only a judiciously selected subset of data that is sensitive to the sharpness. We provide theoretical explanations as to why these strategies perform well. We also show, via extensive experiments on the CIFAR and ImageNet datasets, that ESAM enhances the efficiency over SAM from requiring 100% extra computations to 40% vis-a-vis base optimizers, while test accuracies are preserved or even improved.",
+  "doi": null,
+  "arxiv_id": "2110.03141v2",
+  "url": "https://arxiv.org/abs/2110.03141v2",
+  "pdf_url": "https://arxiv.org/pdf/2110.03141v2",
+  "published_date": "2021-10-07T02:20:37Z",
+  "venue": null,
+  "citations": null,
+  "source": "arxiv",
+  "external_ids": {
+    "arxiv": "2110.03141v2"
+  },
+  "search": {
+    "query": "sharpness aware minimization",
+    "sources": [
+      "arxiv",
+      "airas_records"
+    ],
+    "max_results_per_source": 3,
+    "year": null,
+    "openalex_semantic": false,
+    "source_results": {
+      "arxiv": 3,
+      "airas_records": 0
+    },
+    "search_errors": {}
+  },
+  "fetched_at": "2026-10-15T18:24:16+00:00",
+  "fulltext": {
+    "url": "https://arxiv.org/pdf/2110.03141v2",
+    "parser": "pymupdf 1.28.2",
+    "fetched_at": "2026-10-15T18:24:16+00:00"
+  }
+}

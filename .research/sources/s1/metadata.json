@@ -1,0 +1,42 @@
+{
+  "title": "GCSAM: Gradient Centralized Sharpness Aware Minimization",
+  "authors": [
+    "Mohamed Hassan",
+    "Aleksandar Vakanski",
+    "Boyu Zhang",
+    "Min Xian"
+  ],
+  "abstract": "The generalization performance of deep neural networks (DNNs) is a critical factor in achieving robust model behavior on unseen data. Recent studies have highlighted the importance of sharpness-based measures in promoting generalization by encouraging convergence to flatter minima. Among these approaches, Sharpness-Aware Minimization (SAM) has emerged as an effective optimization technique for reducing the sharpness of the loss landscape, thereby improving generalization. However, SAM's computational overhead and sensitivity to noisy gradients limit its scalability and efficiency. To address these challenges, we propose Gradient-Centralized Sharpness-Aware Minimization (GCSAM), which incorporates Gradient Centralization (GC) to stabilize gradients and accelerate convergence. GCSAM normalizes gradients before the ascent step, reducing noise and variance, and improving stability during training. Our evaluations indicate that GCSAM consistently outperforms SAM and the Adam optimizer in terms of generalization and computational efficiency. These findings demonstrate GCSAM's effectiveness across diverse domains, including general and medical imaging tasks.",
+  "doi": null,
+  "arxiv_id": "2501.11584v2",
+  "url": "https://arxiv.org/abs/2501.11584v2",
+  "pdf_url": "https://arxiv.org/pdf/2501.11584v2",
+  "published_date": "2025-01-20T16:42:31Z",
+  "venue": null,
+  "citations": null,
+  "source": "arxiv",
+  "external_ids": {
+    "arxiv": "2501.11584v2"
+  },
+  "search": {
+    "query": "sharpness aware minimization",
+    "sources": [
+      "arxiv",
+      "airas_records"
+    ],
+    "max_results_per_source": 3,
+    "year": null,
+    "openalex_semantic": false,
+    "source_results": {
+      "arxiv": 3,
+      "airas_records": 0
+    },
+    "search_errors": {}
+  },
+  "fetched_at": "2026-10-15T18:24:16+00:00",
+  "fulltext": {
+    "url": "https://arxiv.org/pdf/2501.11584v2",
+    "parser": "pymupdf 1.28.2",
+    "fetched_at": "2026-10-15T18:24:16+00:00"
+  }
+}
