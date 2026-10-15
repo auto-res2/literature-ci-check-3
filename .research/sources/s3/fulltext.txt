@@ -1783,3 +1783,4 @@ Input resolution
 224 × 224
 224 × 224
 18
+ESAM is always ten points better than SAM.
