@@ -1,1 +1,79 @@
-{}
+{
+  "literature": [
+    {
+      "id": "s3",
+      "title": "Efficient Sharpness-aware Minimization for Improved Training of Neural Networks",
+      "authors": [
+        "Jiawei Du",
+        "Hanshu Yan",
+        "Jiashi Feng",
+        "Joey Tianyi Zhou",
+        "Liangli Zhen",
+        "Rick Siow Mong Goh",
+        "Vincent Y. F. Tan"
+      ],
+      "year": 2021,
+      "arxiv_id": "2110.03141v2",
+      "url": "https://arxiv.org/abs/2110.03141v2",
+      "bibkey": "du-2021-efficient",
+      "verified_by": "arxiv",
+      "verified_at": "2026-10-15T18:24:16+00:00",
+      "fulltext": {
+        "path": ".research/sources/s3/fulltext.txt",
+        "sha256": "c169290230f50b5b0d3ecac294a361ff2fab508765d1be9638e8a1811dac1da6"
+      },
+      "parser": "pymupdf 1.28.2",
+      "passages": [
+        {
+          "id": "s3.p1",
+          "node_type": "method",
+          "quote": "ESAM includes two novel and efficient training strategies"
+        }
+      ]
+    }
+  ],
+  "hypotheses": [
+    {
+      "id": "h1",
+      "statement": "ESAM matches SAM's test accuracy at lower cost.",
+      "quoted_passage_ids": [
+        "s3.p1"
+      ],
+      "claims": [
+        {
+          "id": "c1",
+          "statement": "ESAM's test accuracy is within 0.5 points of SAM's.",
+          "rationale": "The hypothesis's accuracy part, head to head.",
+          "verifier": {
+            "kind": "seyval"
+          },
+          "designs": [
+            {
+              "id": "d1",
+              "runs": [
+                {
+                  "run_id": "esam"
+                },
+                {
+                  "run_id": "sam"
+                }
+              ]
+            }
+          ],
+          "criterion": {
+            "metric": "accuracy",
+            "subject": "esam",
+            "reference": "sam",
+            "op": ">=",
+            "margin": -0.005
+          },
+          "prediction": {
+            "low": -0.005,
+            "high": 0.005,
+            "basis": "s3.p1"
+          }
+        }
+      ]
+    }
+  ]
+}
